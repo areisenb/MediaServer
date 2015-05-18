@@ -22,11 +22,12 @@ sub Usage {
   printf ("    --help:    this output\n");
   printf ("    --verbose: verbose level - up to 3\n");
   printf ("    --file:    input file - otherwise stdin\n");
-  printf ('  execute: sqlite3 mediatomb.db \'select metadata,location \\'."\n");
-  printf ('               from mt_cds_object \\'."\n");
-  printf ('              where (upnp_class="object.item.audioItem.musicTrack") \\'."\n");
-  printf ('             order by location\' >media.txt'."\n");
-  printf ("   to generate appropiate input file\n");
+  printf ('        execute: sqlite3 mediatomb.db \'select metadata,location \\'."\n");
+  printf ('                  from mt_cds_object \\'."\n");
+  printf ('                  where (upnp_class="object.item.audioItem.musicTrack") \\'."\n");
+  printf ('                  order by location\' >media.txt'."\n");
+  printf ("        to generate appropiate input file\n");
+  printf ("    --json:    JSON output files - will not produce JSON out if not provided\n");
   exit;
 }
 
@@ -35,27 +36,36 @@ sub Usage {
 ########
 sub HandleCommandLine {
     my ($cmdLineResult, $strInFile, $bHelp, $nVerbose, $numArgs);
+    my ($strJSONFile);
     my (%envir);
 
     $strInFile="";
     $bHelp=0;
     $nVerbose=0;
+    $strJSONFile="";
     Getopt::Long::Configure ("bundling");
     $cmdLineResult = GetOptions ('file=s' => \$strInFile,
                                  'f=s' => \$strInFile,
                                  'help' => \$bHelp,
                                  'h' => \$bHelp,
                                  'verbose+' =>\$nVerbose,
-                                 'v+' =>\$nVerbose);
+                                 'v+' =>\$nVerbose,
+                                 'json=s' => \$strJSONFile,
+                                 'j=s' => \$strJSONFile,
+                                 );
 
     $numArgs = @ARGV + 1;
 
-    ($cmdLineResult >0 && $numArgs==2 && $bHelp==0) || Usage;
+    ($cmdLineResult >0 && $numArgs>=2 && $bHelp==0) || Usage;
     
     $envir{nVerbLevel} = $nVerbose;
     $envir{strInFile} = $strInFile;
     $envir{strOutFile} = $ARGV[0];
-
+    if (length ($strJSONFile) > 0) {
+      $envir{strJSONTitleFile} = $strJSONFile . ".title.json";
+      $envir{strJSONAlbumFile} = $strJSONFile . ".album.json";
+      $envir{strJSONAlbumFile} = $strJSONFile . ".artist.json";
+    }
     return(%envir);
 }
 
@@ -607,6 +617,84 @@ sub Conv2LatexFont {
 }
 
 ########
+# Init JSON Array File
+########
+sub InitJSONArray {
+   my ($OutFile) = $_[0];
+   if (!defined $OutFile) {
+     return;
+   }
+   print $OutFile "[";   
+}
+
+########
+# Close JSON Array File
+########
+sub CloseJSONArray {
+   my ($OutFile) = $_[0];
+   if (!defined $OutFile) {
+     return;
+   }
+   print $OutFile "]";   
+}
+
+########
+# JSON Title output
+########
+sub Title2JSON  {
+   my ($OutFile) = $_[0];
+   my ($strArtist) = $_[1];
+   my ($nYear) = $_[2];
+   my ($strAlbum) = $_[3];
+   my ($strAlbumArtist) = "";
+   my ($nTrackNo) = $_[4];
+   my ($strTitle) = $_[5];
+   my ($fRating) = $_[6];
+   my ($nTrackLen) = $_[7];
+   my ($nTrackCount) = $_[8];
+   
+   if (!defined $OutFile) {
+     return;
+   }
+
+   if ($nTrackCount > 1) {
+     print $OutFile ",";
+   }
+   #print "Count: ".$nTrackCount."\n";
+   
+   print $OutFile "{".
+         "\"artist\":\"".Conv2JSONFont($strArtist)."\",".
+         "\"year\":".$nYear.",".
+         "\"album\":\"".Conv2JSONFont($strAlbum)."\",";
+   if (defined ($nTrackNo)) {
+     print $OutFile "\"track\":".$nTrackNo.",";
+   }
+   print $OutFile "\"title\":\"".Conv2JSONFont($strTitle)."\",";
+   if (defined ($fRating)) {
+     printf $OutFile "\"rating\":%.1f,", $fRating;
+   }
+   printf $OutFile "\"len\":%d", $nTrackLen;
+   print $OutFile "}\n";
+}
+
+########
+# JSON Font Conversion
+########
+sub Conv2JSONFont {
+   my ($str) = $_[0];
+   my ($org) = $str;
+   
+   #escape double quote character
+   $str =~ s/"/\\"/g;
+   #$str =~ s/\$/\\\$/g;
+   # if ($org ne $str) {
+     # print "changed from \"".$org."\" to \"".$str."\"\n";
+   # }
+   
+   return ($str);
+}
+
+########
 # Convert Rating to Image File Name
 ########
 sub Rating2Graphics  {
@@ -807,7 +895,24 @@ open(INFILE, $currEnvir{strInFile} )
     || die "cannot open ".$currEnvir{strInFile}." for read\n";
 open (OUTFILE, ">".$currEnvir{strOutFile} ) 
     || die "cannot open".$currEnvir{strOutFile}." for write\n";
+if (defined ($currEnvir{strJSONTitleFile})) {
+    open (OUTJSONTITLE, ">".$currEnvir{strJSONTitleFile} ) 
+    || die "cannot open".$currEnvir{strJSONTitleFile}." for write\n";
+} 
+if (defined ($currEnvir{strJSONAlbumFile})) {
+    open (OUTJSONALBUM, ">".$currEnvir{strJSONAlbumFile} ) 
+    || die "cannot open".$currEnvir{strJSONAlbumFile}." for write\n";
+} 
+if (defined ($currEnvir{strJSONArtistFile})) {
+    open (OUTJSONARTIST, ">".$currEnvir{strJSONArtistFile} ) 
+    || die "cannot open".$currEnvir{strJSONArtistFile}." for write\n";
+} 
 
+InitJSONArray (*OUTJSONTITLE);
+InitJSONArray (*OUTJSONALBUM);
+InitJSONArray (*OUTJSONARTIST);
+
+    
 my ($bNewAlbum, @astrAlbum, @anYear, @anTrackNo, @astrTitle, @astrArtist, @astrFileName);
 my (@afRating, @anTrackLen);
 my ($strCoverFileName, $nTrackCount, $strAlbumArtist, $nLineNumber);
@@ -825,6 +930,12 @@ while (<INFILE>) {
    $bNewAlbum = ParseDatafromLine ( $_, \@astrAlbum, \@anYear,
                       \@anTrackNo, \@astrTitle, \@astrArtist, \@astrFileName,
                       \@afRating, \@anTrackLen );
+   #output the JSON file
+   Title2JSON (*OUTJSONTITLE, uri_unescape(@astrArtist[-1]), @anYear[-1],
+        uri_unescape(@astrAlbum[-1]),
+        @anTrackNo[-1], uri_unescape(@astrTitle[-1]), @afRating[-1], 
+        @anTrackLen[-1], $nLineNumber);
+   
    if ($bNewAlbum) {
       $nTrackCount = $#astrFileName; # last index already consists next album
       $strCoverFileName = GenCoverFile ($astrFileName[0], $currEnvir{strOutFile}.".d", $nLineNumber);
@@ -865,7 +976,19 @@ Album2Latex (*OUTFILE, $astrAlbum[0], $strAlbumArtist, $strCoverFileName,
 
 Statistics2Latex (*OUTFILE, \%hStatistics);
      
-
+CloseJSONArray (*OUTJSONARTIST);
+CloseJSONArray (*OUTJSONALBUM);
+CloseJSONArray (*OUTJSONTITLE);
+if (defined *OUTJSONARTIST) {
+  close (OUTJSONARTIST);
+}
+if (defined *OUTJSONALBUM) {
+  close (OUTJSONALBUM);
+}
+if (defined *OUTJSONTITLE) {
+  close (OUTJSONTITLE);
+}
+  
 close (OUTFILE);
 close (INFILE);
 
