@@ -681,6 +681,35 @@ sub Title2JSON  {
 }
 
 ########
+# JSON Album outputng 
+########
+sub Album2JSON  {
+   my ($OutFile) = $_[0];
+   my ($nAlbumCount) = $_[1];   
+   my ($strAlbum) = $_[2];
+   my ($strAlbumArtist) = $_[3];
+   my ($strCoverFileName) = $_[4];
+   my ($nTrackCount) = $_[5];
+   my ($nYear) = $_[6];
+
+   if (!defined $OutFile) {
+     return;
+   }
+
+   if ($nAlbumCount > 1) {
+     print $OutFile ",";
+   }
+   
+   print $OutFile "{".
+         "\"id\":".$nAlbumCount.",".
+         "\"artist\":\"".Conv2JSONFont($strAlbumArtist)."\",".
+         "\"year\":".$nYear.",".
+         "\"album\":\"".Conv2JSONFont($strAlbum)."\",".
+         "\"cover\":\"".Conv2JSONFont($strCoverFileName)."\",".
+         "\"tracks\":".$nTrackCount."}\n";
+}
+
+########
 # JSON Font Conversion
 ########
 sub Conv2JSONFont {
@@ -955,10 +984,14 @@ while (<INFILE>) {
           $hStatistics { nArtistCount } += 1;
       }
       LogOut (1, "Album: ".$astrAlbum[0]." - Track Count: ".$nTrackCount."\n");
+      Album2JSON (*OUTJSONALBUM, $nAlbumId-1, uri_unescape($astrAlbum[0]),
+          uri_unescape($strAlbumArtist), $strCoverFileName, $nTrackCount, $anYear[0]);
+           
       Album2Latex (*OUTFILE, $astrAlbum[0], $strAlbumArtist, $strCoverFileName, 
            $nTrackCount, $anYear[0], 
            \@anTrackNo, \@astrTitle, \@astrArtist, \@afRating, \@anTrackLen,
            \%hStatistics );
+           
       @astrFileName = Reduce2LastItem (\@astrFileName);
       @astrAlbum = Reduce2LastItem (\@astrAlbum);
       @anYear = Reduce2LastItem (\@anYear);
@@ -975,6 +1008,9 @@ if ((!defined ($strOldAlbumArtist)) || ($strOldAlbumArtist ne $strAlbumArtist)) 
     $hStatistics { nArtistCount } += 1;
 }
 LogOut (1, "Album: ".$astrAlbum[0]." - Track Count: ".$nTrackCount."\n");
+Album2JSON (*OUTJSONALBUM, $nAlbumId, uri_unescape($astrAlbum[0]), 
+    uri_unescape($strAlbumArtist), $strCoverFileName, $nTrackCount, $anYear[0]);
+           
 Album2Latex (*OUTFILE, $astrAlbum[0], $strAlbumArtist, $strCoverFileName, 
      $nTrackCount, $anYear[0], 
      \@anTrackNo, \@astrTitle, \@astrArtist, \@afRating, \@anTrackLen,
