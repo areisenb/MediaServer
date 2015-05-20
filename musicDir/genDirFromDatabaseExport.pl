@@ -652,6 +652,7 @@ sub Title2JSON  {
    my ($fRating) = $_[6];
    my ($nTrackLen) = $_[7];
    my ($nTrackCount) = $_[8];
+   my ($nAlbumCount) = $_[9];
    
    if (!defined $OutFile) {
      return;
@@ -663,9 +664,11 @@ sub Title2JSON  {
    #print "Count: ".$nTrackCount."\n";
    
    print $OutFile "{".
+         "\"id\":".$nTrackCount.",".
          "\"artist\":\"".Conv2JSONFont($strArtist)."\",".
          "\"year\":".$nYear.",".
-         "\"album\":\"".Conv2JSONFont($strAlbum)."\",";
+         "\"album\":\"".Conv2JSONFont($strAlbum)."\",".
+         "\"albumId\":".$nAlbumCount.",";
    if (defined ($nTrackNo)) {
      print $OutFile "\"track\":".$nTrackNo.",";
    }
@@ -915,12 +918,13 @@ InitJSONArray (*OUTJSONARTIST);
     
 my ($bNewAlbum, @astrAlbum, @anYear, @anTrackNo, @astrTitle, @astrArtist, @astrFileName);
 my (@afRating, @anTrackLen);
-my ($strCoverFileName, $nTrackCount, $strAlbumArtist, $nLineNumber);
+my ($strCoverFileName, $nTrackCount, $nAlbumId, $strAlbumArtist, $nLineNumber);
 my ($strOldAlbumArtist);
 my (%hStatistics);
 
 #Header2Latex (*OUTFILE);
 $nLineNumber = 0;
+$nAlbumId = 1;
 
 InitStatistics (\%hStatistics);
 $hStatistics {nArtistCount} = 0;
@@ -930,11 +934,15 @@ while (<INFILE>) {
    $bNewAlbum = ParseDatafromLine ( $_, \@astrAlbum, \@anYear,
                       \@anTrackNo, \@astrTitle, \@astrArtist, \@astrFileName,
                       \@afRating, \@anTrackLen );
+   if ($bNewAlbum) {
+      $nAlbumId ++;
+   }
+   
    #output the JSON file
    Title2JSON (*OUTJSONTITLE, uri_unescape(@astrArtist[-1]), @anYear[-1],
         uri_unescape(@astrAlbum[-1]),
         @anTrackNo[-1], uri_unescape(@astrTitle[-1]), @afRating[-1], 
-        @anTrackLen[-1], $nLineNumber);
+        @anTrackLen[-1], $nLineNumber, $nAlbumId);
    
    if ($bNewAlbum) {
       $nTrackCount = $#astrFileName; # last index already consists next album
